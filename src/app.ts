@@ -1,4 +1,5 @@
 import express, { Express } from "express";
+import path from "path";
 import helmet from "helmet";
 import xss from "xss-clean";
 import ExpressMongoSanitize from "express-mongo-sanitize";
@@ -14,63 +15,73 @@ import routes from "./routes/v1";
 
 const app: Express = express();
 
-if ((process.env.NODE_ENV as string) !== "test") {
+if (process.env.NODE_ENV !== "test") {
   app.use(morgan.successHandler);
   app.use(morgan.errorHandler);
 }
 
-// set security HTTP headers
+// Set security HTTP headers
 app.use(helmet());
 
-// enable cors
+// Enable CORS
 app.use(cors());
 app.options("*", cors());
 
-// parse json request body
+// Parse JSON request body
 app.use(express.json());
 
-// parse urlencoded request body
+// Parse URL-encoded request body
 app.use(express.urlencoded({ extended: true }));
 
-// sanitize request data
+// Sanitize request data
 app.use(xss());
 app.use(ExpressMongoSanitize());
 
-// gzip compression
+// Gzip compression
 app.use(compression());
 
+// Session management
 app.use(
   session({
     secret: config.jwt.secret,
     resave: false,
     saveUninitialized: true,
-    cookie: { secure: true },
+    cookie: { secure: process.env.NODE_ENV === "production" },
   })
 );
 
-// limit repeated failed requests to auth endpoints
-if ((process.env.NODE_ENV as string) !== "development") {
+// Limit repeated failed requests to auth endpoints in non-development environments
+if (process.env.NODE_ENV !== "development") {
   app.use("/api/v1/auth", authLimiter);
 }
 
-// v1 api routes
+// API routes
 app.use("/api/v1", routes);
 
+// Serve the React app from the build directory
+app.use(express.static(path.join(__dirname, "../client/build")));
+
+// Serve index.html for any other routes (for client-side routing)
+app.get("*", (req, res) => {
+  res.sendFile(path.join(__dirname, "../client/build", "index.html"));
+});
+
+// Default route
 app.get("/", (req, res) => {
   res
     .status(200)
     .json({ message: `ping me, server is running on port ${config.port}` });
 });
 
-// send back a 404 error for any unknown api request
+// Send back a 404 error for any unknown API request
 app.use((_req, _res, next) => {
   next(new ApiError(httpStatus.NOT_FOUND, "Request Endpoint Not found"));
 });
 
-// convert error to ApiError, if needed
+// Convert errors to ApiError, if needed
 app.use(errorConverter);
 
-// handle error
+// Handle errors
 app.use(errorHandler);
 
 export default app;
