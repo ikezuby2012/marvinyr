@@ -1,14 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { WalletMultiButton } from "@solana/wallet-adapter-react-ui";
 import { useWallet } from "@solana/wallet-adapter-react";
-import {
-  useNavigate,
-  Link,
-  useParams,
-  BrowserRouter,
-  Route,
-  Routes,
-} from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import {
   FaHome,
   FaSearch,
@@ -24,54 +17,28 @@ import {
   FaBook,
   FaBrain,
 } from "react-icons/fa";
+import axios from "axios";
 import "./UserProfile.css";
 
-// Sample course data
-export const courses = [
-  {
-    id: 1,
-    imgSrc: "https://via.placeholder.com/300",
-    title: "Building on Solana",
-    time: "3h 20m",
-    rating: "4.5",
-    price: 100,
-    category: "Development",
-    description: "This course teaches you how to build on Solana",
-  },
-  {
-    id: 2,
-    imgSrc: "https://via.placeholder.com/300",
-    title: "Solana for Dummies",
-    time: "2h 15m",
-    rating: "4.0",
-    price: 80,
-    category: "Education",
-    description: "This course is for beginners who want to learn about Solana",
-  },
-  {
-    id: 3,
-    imgSrc: "https://via.placeholder.com/300",
-    title: "New Stuff",
-    time: "4h 5m",
-    rating: "4.8",
-    price: 120,
-    category: "Rocket Science",
-    description: "This course teaches you about new stuff in Solana",
-  },
-  {
-    id: 4,
-    imgSrc: "https://via.placeholder.com/300",
-    title: "Random Stuff",
-    time: "5h 30m",
-    rating: "4.2",
-    price: 90,
-    category: "Innovation",
-    description: "This course is about random stuff in Solana",
-  },
-];
+const USDC_SYMBOL_URL = "https://cryptologos.cc/logos/solana-sol-logo.png";
 
-// Sample categories data
-const categories = [
+// Define the structure of Course and Category
+interface Course {
+  _id: string;
+  image: string;
+  title: string;
+  time?: string;
+  rating: number;
+  price: number;
+  category: string;
+}
+
+interface Category {
+  name: string;
+  icon: JSX.Element;
+}
+
+const categories: Category[] = [
   { name: "Development", icon: <FaCode size={24} /> },
   { name: "Finance", icon: <FaChartLine size={24} /> },
   { name: "Education", icon: <FaBook size={24} /> },
@@ -80,15 +47,16 @@ const categories = [
   { name: "Technology", icon: <FaLaptopCode size={24} /> },
 ];
 
-const USDC_SYMBOL_URL = "https://cryptologos.cc/logos/usd-coin-usdc-logo.png"; // Replace with actual URL
-
 const UserProfile: React.FC = () => {
-  const { publicKey, disconnect } = useWallet();
+  const { publicKey } = useWallet();
   const navigate = useNavigate();
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   const [sidebarOpen, setSidebarOpen] = useState(true);
-  const [savedCourses, setSavedCourses] = useState<number[]>([]); // State to store saved courses
-  const [bloomActive, setBloomActive] = useState<number | null>(null); // State to manage bloom animation
+  const [savedCourses, setSavedCourses] = useState<string[]>([]);
+  const [bloomActive, setBloomActive] = useState<string | null>(null);
+  const [courses, setCourses] = useState<Course[]>([]);
+  const [loading, setLoading] = useState<boolean>(false);
+  const [error, setError] = useState<string>("");
 
   useEffect(() => {
     if (!publicKey) {
@@ -96,38 +64,58 @@ const UserProfile: React.FC = () => {
     }
   }, [publicKey, navigate]);
 
+  // Fetch courses from the backend
+  useEffect(() => {
+    const fetchCourses = async () => {
+      setLoading(true);
+      try {
+        const response = await axios.get(
+          "https://r6z95h-5001.csb.app/api/v1/course"
+        );
+        console.log("API Response:", response.data); // Detailed log
+        // Adjust based on actual response structure
+        const fetchedCourses =
+          response.data.data.results || response.data.results || [];
+        setCourses(fetchedCourses);
+      } catch (error: any) {
+        console.error("Error fetching courses:", error);
+        setError(
+          error.response?.data?.message ||
+            "Failed to fetch courses. Please try again later."
+        );
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchCourses();
+  }, []);
+
   const toggleSidebar = () => {
     setSidebarOpen(!sidebarOpen);
   };
 
   const handleCategoryClick = (category: string) => {
-    setSelectedCategory(null); // Trigger fade-out
-    setTimeout(() => {
-      setSelectedCategory(category); // Trigger fade-in after delay
-    }, 300);
+    setSelectedCategory(category);
   };
 
-  // Handles bookmark click
-  const handleBookmarkClick = (courseId: number) => {
-    setSavedCourses(
-      (prevSaved) =>
-        prevSaved.includes(courseId)
-          ? prevSaved.filter((id) => id !== courseId) // Remove if already saved
-          : [...prevSaved, courseId] // Add to saved if not yet
+  const handleBookmarkClick = (courseId: string) => {
+    setSavedCourses((prevSaved) =>
+      prevSaved.includes(courseId)
+        ? prevSaved.filter((id) => id !== courseId)
+        : [...prevSaved, courseId]
     );
-    // Activate bloom animation for a specific course
     setBloomActive(courseId);
-    // Remove the animation after a short duration
-    setTimeout(() => {
-      setBloomActive(null);
-    }, 300);
+    setTimeout(() => setBloomActive(null), 300);
   };
 
   return (
     <div className="min-h-screen bg-gray-900 text-white flex">
       {/* Sidebar */}
       <div
-        className={`bg-gray-800 ${sidebarOpen ? "w-24" : "w-16"} transition-all duration-300 p-4 flex flex-col items-center`}
+        className={`bg-gray-800 ${
+          sidebarOpen ? "w-24" : "w-16"
+        } transition-all duration-300 p-4 flex flex-col items-center`}
       >
         <button
           onClick={toggleSidebar}
@@ -188,7 +176,11 @@ const UserProfile: React.FC = () => {
               >
                 <div className="mb-2 text-gray-400">{category.icon}</div>
                 <span
-                  className={`text-sm font-semibold transition-colors duration-300 ${selectedCategory === category.name ? "text-light-blue-300" : "text-white"}`}
+                  className={`text-sm font-semibold transition-colors duration-300 ${
+                    selectedCategory === category.name
+                      ? "text-light-blue-300"
+                      : "text-white"
+                  }`}
                 >
                   {category.name}
                 </span>
@@ -198,51 +190,74 @@ const UserProfile: React.FC = () => {
         </section>
 
         {/* Course Cards */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-          {courses
-            .filter((course) =>
-              selectedCategory ? course.category === selectedCategory : true
-            )
-            .map((course) => (
-              <Link to={`/courses/${course.id}`} key={course.id}>
-                <div className="bg-gray-800 rounded-lg shadow-lg transition-transform transform hover:scale-105 p-4 flex flex-col">
-                  <div className="relative mb-4">
-                    <img
-                      src={course.imgSrc}
-                      alt={course.title}
-                      className="w-full h-32 object-cover rounded-t-lg"
-                    />
-                    <FaBookmark
-                      size={18}
-                      onClick={() => handleBookmarkClick(course.id)}
-                      className={`absolute top-2 left-2 cursor-pointer text-white p-1 rounded-full ${
-                        savedCourses.includes(course.id)
-                          ? "bg-yellow-500"
-                          : "bg-gray-800"
-                      } ${bloomActive === course.id ? "bloom" : ""}`} // Apply bloom animation
-                    />
-                  </div>
-                  <p className="text-sm font-semibold mb-2">{course.title}</p>
-                  <div className="flex justify-between text-gray-400 mb-2">
-                    <div className="flex items-center space-x-2">
-                      <FaStar size={14} />
-                      <span className="text-xs">{course.rating}</span>
+        <section>
+          <h2 className="text-2xl font-semibold mb-4">Courses</h2>
+          {loading ? (
+            <p>Loading courses...</p>
+          ) : error ? (
+            <p className="text-red-500">{error}</p>
+          ) : courses.length === 0 ? (
+            <p>No courses available.</p>
+          ) : (
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+              {courses
+                .filter((course) =>
+                  selectedCategory ? course.category === selectedCategory : true
+                )
+                .map((course) => (
+                  <Link to={`/courses/${course._id}`} key={course._id}>
+                    <div className="bg-gray-800 rounded-lg shadow-lg transition-transform transform hover:scale-105 p-4 flex flex-col">
+                      <div className="relative mb-4">
+                        <img
+                          src={course.image}
+                          alt={course.title}
+                          className="w-full h-32 object-cover rounded-t-lg"
+                        />
+                        <FaBookmark
+                          size={18}
+                          onClick={(e) => {
+                            e.preventDefault(); // Prevent navigation on bookmark click
+                            handleBookmarkClick(course._id);
+                          }}
+                          className={`absolute top-2 left-2 cursor-pointer text-white p-1 rounded-full ${
+                            savedCourses.includes(course._id)
+                              ? "bg-yellow-500"
+                              : "bg-gray-800"
+                          } ${bloomActive === course._id ? "bloom" : ""}`}
+                        />
+                      </div>
+                      <p className="text-sm font-semibold mb-2">
+                        {course.title}
+                      </p>
+                      <div className="flex justify-between text-gray-400 mb-2">
+                        <div className="flex items-center space-x-2">
+                          <FaStar size={14} />
+                          <span className="text-xs">{course.rating}</span>
+                        </div>
+                        {course.time && (
+                          <div className="flex items-center space-x-2">
+                            <FaClock size={14} />
+                            <span className="text-xs">{course.time}</span>
+                          </div>
+                        )}
+                      </div>
+                      <p className="text-sm font-bold flex items-center space-x-1">
+                        <img
+                          src={USDC_SYMBOL_URL}
+                          alt="USDC"
+                          className="w-4 h-4"
+                        />
+                        <span>{course.price} SOL</span>
+                      </p>
                     </div>
-                    <div className="flex items-center space-x-2">
-                      <FaClock size={14} />
-                      <span className="text-xs">{course.time}</span>
-                    </div>
-                  </div>
-                  <p className="text-sm font-bold flex items-center space-x-1">
-                    <img src={USDC_SYMBOL_URL} alt="USDC" className="w-4 h-4" />
-                    <span>{course.price} USDC</span>
-                  </p>
-                </div>
-              </Link>
-            ))}
-        </div>
+                  </Link>
+                ))}
+            </div>
+          )}
+        </section>
       </div>
     </div>
   );
 };
+
 export default UserProfile;

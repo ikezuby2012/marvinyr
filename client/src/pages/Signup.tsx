@@ -40,7 +40,7 @@ const Register = () => {
     try {
       // Send form data to the server
       const response = await axios.post(
-        "http://localhost:5000/api/register",
+        "https://r6z95h-5001.csb.app/api/v1/auth/register",
         formData
       );
       setSuccessMessage(
@@ -159,9 +159,9 @@ const Register = () => {
               required
               className="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
             >
-              <option value="user">User</option>
-              <option value="author">Author</option>
-              <option value="affiliate">Affiliate</option>
+              <option value="USER">User</option>
+              <option value="AUTHOR">Author</option>
+              <option value="AFFILIATOR">Affiliate</option>
             </select>
           </div>
 

@@ -1,9 +1,18 @@
-export interface Course {
-  id: number;
-  imgSrc: string;
-  title: string;
-  time: string;
-  rating: string;
-  price: number;
-  category: string;
+// src/pages/types.ts
+
+export interface User {
+  _id: string;
+  name: string;
+  email: string;
+  accessRole: "USER" | "AUTHOR" | "AFFILIATOR" | "ADMIN";
+}
+
+export interface ReferralLink {
+  _id: string;
+  AffliateId: string;
+  CourseId: string;
+  Link: string;
+  expired?: boolean;
+  expired_at?: Date;
+  isSoftDeleted: boolean;
 }

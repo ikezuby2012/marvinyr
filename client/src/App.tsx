@@ -5,7 +5,8 @@ import LandingPage from "./pages/LandingPage";
 import UserProfile from "./pages/UserProfile";
 import WalletContextProvider from "./pages/WalletProvider";
 import ProfilePage from "./pages/ProfilePage";
-// import CourseDetails from "./pages/CourseDetail";
+import Register from "./pages/Signup";
+import LoginForm from "./pages/Login";
 
 const App: React.FC = () => {
   return (
@@ -15,7 +16,8 @@ const App: React.FC = () => {
           <Route path="/" element={<LandingPage />} />
           <Route path="/userprofile" element={<UserProfile />} />
           <Route path="/profilepage" element={<ProfilePage />} />
-          {/* <Route path="/courses/:id" element={<CourseDetails() />} /> */}
+          <Route path="/signup" element={<Register />} />
+          <Route path="/login" element={<LoginForm />} />
         </Routes>
       </Router>
     </WalletContextProvider>
