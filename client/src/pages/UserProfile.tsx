@@ -1,6 +1,8 @@
 import React, { useEffect, useState } from "react";
 import { WalletMultiButton } from "@solana/wallet-adapter-react-ui";
 import { useWallet } from "@solana/wallet-adapter-react";
+import { useConnection } from "@solana/wallet-adapter-react";
+import * as web3 from "@solana/web3.js";
 import { Link, useNavigate } from "react-router-dom";
 import {
   FaHome,
@@ -48,7 +50,8 @@ const categories: Category[] = [
 ];
 
 const UserProfile: React.FC = () => {
-  const { publicKey } = useWallet();
+  const { publicKey, sendTransaction } = useWallet();
+  const { connection } = useConnection();
   const navigate = useNavigate();
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   const [sidebarOpen, setSidebarOpen] = useState(true);
@@ -57,6 +60,52 @@ const UserProfile: React.FC = () => {
   const [courses, setCourses] = useState<Course[]>([]);
   const [loading, setLoading] = useState<boolean>(false);
   const [error, setError] = useState<string>("");
+  const [isPurchasePending, setIsPurchasePending] = useState(false);
+
+  // Solana Pay Integration
+  const handlePurchaseCourse = async (course: Course) => {
+    if (!publicKey) {
+      alert("Please connect your wallet first");
+      return;
+    }
+
+    const confirmPurchase = window.confirm(
+      `Would you like to purchase "${course.title}" for ${course.price} SOL?`
+    );
+
+    if (!confirmPurchase) return;
+
+    setIsPurchasePending(true);
+    try {
+      const transaction = new web3.Transaction();
+      const recipientPubKey = new web3.PublicKey(
+        "8o51DCQ2RN3FvRSiHnrAStBXhhMo9pxB3doW25M7rqPc"
+      );
+
+      // Convert SOL to lamports (1 SOL = 1 billion lamports)
+      const lamports = course.price * web3.LAMPORTS_PER_SOL;
+
+      const sendSolInstruction = web3.SystemProgram.transfer({
+        fromPubkey: publicKey,
+        toPubkey: recipientPubKey,
+        lamports: lamports,
+      });
+
+      transaction.add(sendSolInstruction);
+
+      const signature = await sendTransaction(transaction, connection);
+      const confirmation = await connection.confirmTransaction(signature);
+
+      if (confirmation) {
+        alert(`Purchase successful! Transaction signature: ${signature}`);
+        // Here you could add logic to grant access to the course
+      }
+    } catch (error: any) {
+      alert(`Transaction failed: ${error.message}`);
+    } finally {
+      setIsPurchasePending(false);
+    }
+  };
 
   useEffect(() => {
     if (!publicKey) {
@@ -72,13 +121,10 @@ const UserProfile: React.FC = () => {
         const response = await axios.get(
           "https://r6z95h-5001.csb.app/api/v1/course"
         );
-        console.log("API Response:", response.data); // Detailed log
-        // Adjust based on actual response structure
         const fetchedCourses =
           response.data.data.results || response.data.results || [];
         setCourses(fetchedCourses);
       } catch (error: any) {
-        console.error("Error fetching courses:", error);
         setError(
           error.response?.data?.message ||
             "Failed to fetch courses. Please try again later."
@@ -205,52 +251,52 @@ const UserProfile: React.FC = () => {
                   selectedCategory ? course.category === selectedCategory : true
                 )
                 .map((course) => (
-                  <Link to={`/courses/${course._id}`} key={course._id}>
-                    <div className="bg-gray-800 rounded-lg shadow-lg transition-transform transform hover:scale-105 p-4 flex flex-col">
-                      <div className="relative mb-4">
-                        <img
-                          src={course.image}
-                          alt={course.title}
-                          className="w-full h-32 object-cover rounded-t-lg"
-                        />
-                        <FaBookmark
-                          size={18}
-                          onClick={(e) => {
-                            e.preventDefault(); // Prevent navigation on bookmark click
-                            handleBookmarkClick(course._id);
-                          }}
-                          className={`absolute top-2 left-2 cursor-pointer text-white p-1 rounded-full ${
-                            savedCourses.includes(course._id)
-                              ? "bg-yellow-500"
-                              : "bg-gray-800"
-                          } ${bloomActive === course._id ? "bloom" : ""}`}
-                        />
-                      </div>
-                      <p className="text-sm font-semibold mb-2">
-                        {course.title}
-                      </p>
-                      <div className="flex justify-between text-gray-400 mb-2">
-                        <div className="flex items-center space-x-2">
-                          <FaStar size={14} />
-                          <span className="text-xs">{course.rating}</span>
-                        </div>
-                        {course.time && (
-                          <div className="flex items-center space-x-2">
-                            <FaClock size={14} />
-                            <span className="text-xs">{course.time}</span>
-                          </div>
-                        )}
-                      </div>
-                      <p className="text-sm font-bold flex items-center space-x-1">
-                        <img
-                          src={USDC_SYMBOL_URL}
-                          alt="USDC"
-                          className="w-4 h-4"
-                        />
-                        <span>{course.price} SOL</span>
-                      </p>
+                  <div
+                    key={course._id}
+                    onClick={() => handlePurchaseCourse(course)}
+                    className="bg-gray-800 rounded-lg shadow-lg transition-transform transform hover:scale-105 p-4 flex flex-col cursor-pointer"
+                  >
+                    <div className="relative mb-4">
+                      <img
+                        src={course.image}
+                        alt={course.title}
+                        className="w-full h-32 object-cover rounded-t-lg"
+                      />
+                      <FaBookmark
+                        size={18}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleBookmarkClick(course._id);
+                        }}
+                        className={`absolute top-2 left-2 cursor-pointer text-white p-1 rounded-full ${
+                          savedCourses.includes(course._id)
+                            ? "bg-yellow-500"
+                            : "bg-gray-800"
+                        } ${bloomActive === course._id ? "bloom" : ""}`}
+                      />
                     </div>
-                  </Link>
+                    <p className="text-sm font-semibold mb-2">{course.title}</p>
+                    <div className="flex justify-between text-gray-400 mb-2">
+                      <div className="flex items-center space-x-2">
+                        <FaStar size={14} />
+                        <span className="text-xs">{course.rating}</span>
+                      </div>
+                      {course.time && (
+                        <div className="flex items-center space-x-2">
+                          <FaClock size={14} />
+                          <span className="text-xs">{course.time}</span>
+                        </div>
+                      )}
+                    </div>
+                    <p className="text-sm font-bold flex items-center space-x-1">
+                      <img
+                        src={USDC_SYMBOL_URL}
+                        alt="USDC"
+                        className="w-4 h-4"
+                      />
+                      <span>{course.price} SOL</span>
+                    </p>
+                  </div>
                 ))}
             </div>
           )}
